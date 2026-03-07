@@ -2,15 +2,23 @@
 
 Connect Code-Graph-RAG to Claude Code for powerful codebase analysis and editing.
 
-## Quick Setup
+## Quick Setup (No API Key Required)
 
-Configure the MCP server from your project directory:
+If your MCP client already has LLM capabilities (e.g. Claude Code with a Max subscription), you don't need a separate API key. The client generates Cypher queries itself using `run_cypher` and `get_graph_schema`.
 
 ```bash
-# Navigate to your project first
-cd /path/to/your/project
+claude mcp add --transport stdio code-graph-rag \
+  --env TARGET_REPO_PATH="$(pwd)" \
+  -- uv run --directory /absolute/path/to/code-graph-rag code-graph-rag mcp-server
+```
 
-# Add MCP server with project path
+**Replace** `/absolute/path/to/code-graph-rag` with where you cloned this repo.
+
+## Setup with LLM Provider
+
+If you want the server to handle natural language → Cypher translation internally via `query_code_graph`, configure an LLM provider:
+
+```bash
 claude mcp add --transport stdio code-graph-rag \
   --env TARGET_REPO_PATH="$(pwd)" \
   --env CYPHER_PROVIDER=google \
@@ -19,29 +27,15 @@ claude mcp add --transport stdio code-graph-rag \
   -- uv run --directory /absolute/path/to/code-graph-rag code-graph-rag mcp-server
 ```
 
-**Replace**:
-- `/absolute/path/to/code-graph-rag` - Where you cloned this repo
-- `your-google-api-key` - Your Google AI API key
+## Explicit Repository Path
 
-The `"$(pwd)"` automatically uses your current directory as the target repository.
-
-## Alternative: Explicit Path
-
-Specify the repository path explicitly:
+Specify the repository path explicitly instead of using `$(pwd)`:
 
 ```bash
 claude mcp add --transport stdio code-graph-rag \
   --env TARGET_REPO_PATH=/absolute/path/to/your/project \
-  --env CYPHER_PROVIDER=google \
-  --env CYPHER_MODEL=gemini-2.0-flash \
-  --env CYPHER_API_KEY=your-google-api-key \
   -- uv run --directory /absolute/path/to/code-graph-rag code-graph-rag mcp-server
 ```
-
-**Replace**:
-- `/absolute/path/to/your/project` - Your codebase to analyze
-- `/absolute/path/to/code-graph-rag` - Where you cloned this repo
-- `your-google-api-key` - Your Google AI API key
 
 ## Prerequisites
 
@@ -68,16 +62,38 @@ docker run -p 7687:7687 -p 7444:7444 memgraph/memgraph-platform
 
 ## Available Tools
 
+### Graph querying (no API key needed)
+- **get_graph_schema** - Introspect node types, properties, and relationships
+- **run_cypher** - Execute read-only Cypher queries directly against Memgraph
+
+### Graph querying (requires LLM provider)
+- **query_code_graph** - Natural language queries (server translates to Cypher internally)
+
+### Code operations
 - **index_repository** - Build knowledge graph (clears previous repository data)
-- **query_code_graph** - Natural language queries
 - **get_code_snippet** - Retrieve code by name
 - **surgical_replace_code** - Precise code edits
 - **read_file / write_file** - File operations
 - **list_directory** - Browse directories
+- **list_projects / delete_project / wipe_database** - Manage indexed projects
+
+### How `run_cypher` works
+
+When no LLM provider is configured, the MCP client (e.g. Claude Code) acts as
+the intelligence layer. A typical workflow:
+
+1. Call `get_graph_schema` to discover node labels, properties, and relationship types
+2. Generate a Cypher query based on the schema and the user's question
+3. Call `run_cypher` with the query to get results
+
+This avoids the need for a separate API key — the LLM capabilities of the MCP
+client are sufficient.
 
 ## LLM Provider Options
 
-**OpenAI** (recommended):
+Only needed if you want to use `query_code_graph` for server-side natural language → Cypher translation.
+
+**OpenAI**:
 ```bash
 --env CYPHER_PROVIDER=openai \
 --env CYPHER_MODEL=gpt-4 \
