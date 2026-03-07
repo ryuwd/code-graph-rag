@@ -11,7 +11,7 @@ from codebase_rag.graph_updater import GraphUpdater
 from codebase_rag.models import ToolMetadata
 from codebase_rag.parser_loader import load_parsers
 from codebase_rag.services.graph_service import MemgraphIngestor
-from codebase_rag.services.llm import CypherGenerator
+from codebase_rag.services.llm import CypherGenerator, _validate_cypher_read_only
 from codebase_rag.tools import tool_descriptions as td
 from codebase_rag.tools.code_retrieval import CodeRetriever, create_code_retrieval_tool
 from codebase_rag.tools.codebase_query import create_query_tool
@@ -44,7 +44,7 @@ class MCPToolsRegistry:
         self,
         project_root: str,
         ingestor: MemgraphIngestor,
-        cypher_gen: CypherGenerator,
+        cypher_gen: CypherGenerator | None = None,
     ) -> None:
         self.project_root = project_root
         self.ingestor = ingestor
@@ -59,9 +59,12 @@ class MCPToolsRegistry:
         self.file_writer = FileWriter(project_root=project_root)
         self.directory_lister = DirectoryLister(project_root=project_root)
 
-        self._query_tool = create_query_tool(
-            ingestor=ingestor, cypher_gen=cypher_gen, console=None
-        )
+        if cypher_gen is not None:
+            self._query_tool = create_query_tool(
+                ingestor=ingestor, cypher_gen=cypher_gen, console=None
+            )
+        else:
+            self._query_tool = None
         self._code_tool = create_code_retrieval_tool(code_retriever=self.code_retriever)
         self._file_editor_tool = create_file_editor_tool(file_editor=self.file_editor)
         self._file_reader_tool = create_file_reader_tool(file_reader=self.file_reader)
@@ -249,6 +252,33 @@ class MCPToolsRegistry:
                 handler=self.list_directory,
                 returns_json=False,
             ),
+            cs.MCPToolName.RUN_CYPHER: ToolMetadata(
+                name=cs.MCPToolName.RUN_CYPHER,
+                description=td.MCP_TOOLS[cs.MCPToolName.RUN_CYPHER],
+                input_schema=MCPInputSchema(
+                    type=cs.MCPSchemaType.OBJECT,
+                    properties={
+                        cs.MCPParamName.CYPHER_QUERY: MCPInputSchemaProperty(
+                            type=cs.MCPSchemaType.STRING,
+                            description=td.MCP_PARAM_CYPHER_QUERY,
+                        )
+                    },
+                    required=[cs.MCPParamName.CYPHER_QUERY],
+                ),
+                handler=self.run_cypher,
+                returns_json=True,
+            ),
+            cs.MCPToolName.GET_GRAPH_SCHEMA: ToolMetadata(
+                name=cs.MCPToolName.GET_GRAPH_SCHEMA,
+                description=td.MCP_TOOLS[cs.MCPToolName.GET_GRAPH_SCHEMA],
+                input_schema=MCPInputSchema(
+                    type=cs.MCPSchemaType.OBJECT,
+                    properties={},
+                    required=[],
+                ),
+                handler=self.get_graph_schema,
+                returns_json=True,
+            ),
         }
 
     async def list_projects(self) -> ListProjectsResult:
@@ -343,6 +373,13 @@ class MCPToolsRegistry:
 
     async def query_code_graph(self, natural_language_query: str) -> QueryResultDict:
         logger.info(lg.MCP_QUERY_CODE_GRAPH.format(query=natural_language_query))
+        if self._query_tool is None:
+            return QueryResultDict(
+                error="query_code_graph requires an LLM provider. Use run_cypher instead.",
+                query_used=cs.QUERY_NOT_AVAILABLE,
+                results=[],
+                summary="No LLM provider configured. Use get_graph_schema + run_cypher to query directly.",
+            )
         try:
             graph_data = await self._query_tool.function(natural_language_query)
             result_dict: QueryResultDict = graph_data.model_dump()
@@ -460,6 +497,33 @@ class MCPToolsRegistry:
             logger.error(lg.MCP_ERROR_LIST_DIR.format(error=e))
             return te.ERROR_WRAPPER.format(message=e)
 
+    async def run_cypher(self, cypher_query: str) -> dict:
+        logger.info(f"MCP run_cypher: {cypher_query}")
+        try:
+            _validate_cypher_read_only(cypher_query)
+            rows = await asyncio.to_thread(self.ingestor.fetch_all, cypher_query)
+            return {"results": rows, "count": len(rows)}
+        except Exception as e:
+            logger.error(f"MCP run_cypher error: {e}")
+            return {"error": str(e), "results": [], "count": 0}
+
+    async def get_graph_schema(self) -> dict:
+        logger.info("MCP get_graph_schema")
+        try:
+            labels_rows = await asyncio.to_thread(
+                self.ingestor.fetch_all, "CALL schema.node_type_properties() YIELD nodeType, propertyName RETURN nodeType, collect(propertyName) as properties;"
+            )
+            rel_rows = await asyncio.to_thread(
+                self.ingestor.fetch_all, "CALL schema.rel_type_properties() YIELD relType RETURN DISTINCT relType;"
+            )
+            return {
+                "node_types": labels_rows,
+                "relationship_types": rel_rows,
+            }
+        except Exception as e:
+            logger.error(f"MCP get_graph_schema error: {e}")
+            return {"error": str(e)}
+
     def get_tool_schemas(self) -> list[MCPToolSchema]:
         return [
             MCPToolSchema(
@@ -478,7 +542,7 @@ class MCPToolsRegistry:
 def create_mcp_tools_registry(
     project_root: str,
     ingestor: MemgraphIngestor,
-    cypher_gen: CypherGenerator,
+    cypher_gen: CypherGenerator | None = None,
 ) -> MCPToolsRegistry:
     return MCPToolsRegistry(
         project_root=project_root,

@@ -2394,6 +2394,8 @@ class MCPToolName(StrEnum):
     READ_FILE = "read_file"
     WRITE_FILE = "write_file"
     LIST_DIRECTORY = "list_directory"
+    RUN_CYPHER = "run_cypher"
+    GET_GRAPH_SCHEMA = "get_graph_schema"
 
 
 # (H) MCP environment variables
@@ -2433,6 +2435,7 @@ class MCPParamName(StrEnum):
     LIMIT = "limit"
     CONTENT = "content"
     DIRECTORY_PATH = "directory_path"
+    CYPHER_QUERY = "cypher_query"
 
 
 # (H) MCP server constants

@@ -130,6 +130,26 @@ MCP_PARAM_OFFSET = "Line number to start reading from (0-based, optional)"
 MCP_PARAM_LIMIT = "Maximum number of lines to read (optional)"
 MCP_PARAM_CONTENT = "Content to write to the file"
 MCP_PARAM_DIRECTORY_PATH = "Relative path to directory from project root (default: '.')"
+MCP_PARAM_CYPHER_QUERY = (
+    "A read-only Cypher query to execute against the Memgraph knowledge graph. "
+    "Must start with MATCH. Destructive operations (CREATE, DELETE, SET, REMOVE, MERGE, DROP, DETACH) are blocked."
+)
+
+MCP_RUN_CYPHER = (
+    "Execute a raw Cypher query directly against the Memgraph knowledge graph. "
+    "Only read-only queries (MATCH/RETURN) are allowed. "
+    "Use get_graph_schema first to understand the available node types and relationships."
+)
+
+MCP_GET_GRAPH_SCHEMA = (
+    "Return the graph schema: node labels with property keys and relationship types. "
+    "Use this to understand the structure before writing Cypher queries with run_cypher. "
+    "Node types include: Project, Package, Folder, File, Module, Class, Function, Method, "
+    "Interface, Enum, Type, Union, ExternalPackage. "
+    "Relationships include: CONTAINS_PACKAGE, CONTAINS_FOLDER, CONTAINS_FILE, CONTAINS_MODULE, "
+    "DEFINES, DEFINES_METHOD, IMPORTS, EXPORTS, INHERITS, IMPLEMENTS, OVERRIDES, "
+    "DEPENDS_ON_EXTERNAL, CALLS."
+)
 
 
 MCP_TOOLS: dict[MCPToolName, str] = {
@@ -143,6 +163,8 @@ MCP_TOOLS: dict[MCPToolName, str] = {
     MCPToolName.READ_FILE: MCP_READ_FILE,
     MCPToolName.WRITE_FILE: MCP_WRITE_FILE,
     MCPToolName.LIST_DIRECTORY: MCP_LIST_DIRECTORY,
+    MCPToolName.RUN_CYPHER: MCP_RUN_CYPHER,
+    MCPToolName.GET_GRAPH_SCHEMA: MCP_GET_GRAPH_SCHEMA,
 }
 
 AGENTIC_TOOLS: dict[AgenticToolName, str] = {

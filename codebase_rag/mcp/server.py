@@ -75,7 +75,11 @@ def create_server() -> tuple[Server, MemgraphIngestor]:
         password=settings.MEMGRAPH_PASSWORD,
     )
 
-    cypher_generator = CypherGenerator()
+    cypher_generator: CypherGenerator | None = None
+    try:
+        cypher_generator = CypherGenerator()
+    except Exception as e:
+        logger.warning(f"No LLM provider configured, query_code_graph disabled (use run_cypher instead): {e}")
 
     tools = create_mcp_tools_registry(
         project_root=str(project_root),
