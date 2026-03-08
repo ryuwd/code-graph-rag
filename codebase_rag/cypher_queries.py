@@ -79,7 +79,8 @@ RETURN n.qualified_name AS qualified_name, n.start_line AS start_line,
 CYPHER_FIND_BY_QUALIFIED_NAME = """
 MATCH (n) WHERE n.qualified_name = $qn
 OPTIONAL MATCH (m:Module)-[*]-(n)
-RETURN n.name AS name, n.start_line AS start, n.end_line AS end, m.path AS path, n.docstring AS docstring
+OPTIONAL MATCH (p:Project)-[*1..5]->(m)
+RETURN n.name AS name, n.start_line AS start, n.end_line AS end, m.path AS path, n.docstring AS docstring, p.name AS project_name
 LIMIT 1
 """
 

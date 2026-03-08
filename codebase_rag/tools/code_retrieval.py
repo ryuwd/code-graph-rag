@@ -47,6 +47,7 @@ class CodeRetriever:
             file_path_str = res.get("path")
             start_line = res.get("start")
             end_line = res.get("end")
+            project_name = res.get("project_name")
 
             if not all([file_path_str, start_line, end_line]):
                 return CodeSnippet(
@@ -59,7 +60,13 @@ class CodeRetriever:
                     error_message=te.CODE_MISSING_LOCATION,
                 )
 
+            # In multi-project setups, module paths are relative to the
+            # project directory (e.g. "GaudiAlg/src/lib/TupleObj.cpp").
+            # Prepend the project name so the full path resolves correctly
+            # (e.g. "LHCb/GaudiAlg/src/lib/TupleObj.cpp").
             full_path = self.project_root / file_path_str
+            if project_name and not full_path.exists():
+                full_path = self.project_root / project_name / file_path_str
             with full_path.open("r", encoding=ENCODING_UTF8) as f:
                 all_lines = f.readlines()
 
