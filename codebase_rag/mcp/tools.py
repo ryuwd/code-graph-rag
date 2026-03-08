@@ -59,6 +59,8 @@ class MCPToolsRegistry:
         self.file_writer = FileWriter(project_root=project_root)
         self.directory_lister = DirectoryLister(project_root=project_root)
 
+        self._project_root_path = Path(project_root).resolve()
+
         if cypher_gen is not None:
             self._query_tool = create_query_tool(
                 ingestor=ingestor, cypher_gen=cypher_gen, console=None
@@ -425,8 +427,13 @@ class MCPToolsRegistry:
     ) -> str:
         logger.info(lg.MCP_SURGICAL_REPLACE.format(path=file_path))
         try:
+            resolved = self._resolve_path(file_path)
+            try:
+                resolved_rel = str(resolved.relative_to(self._project_root_path))
+            except ValueError:
+                resolved_rel = file_path
             result = await self._file_editor_tool.function(
-                file_path=file_path,
+                file_path=resolved_rel,
                 target_code=target_code,
                 replacement_code=replacement_code,
             )
@@ -435,13 +442,40 @@ class MCPToolsRegistry:
             logger.error(lg.MCP_ERROR_REPLACE.format(error=e))
             return te.ERROR_WRAPPER.format(message=e)
 
+    def _resolve_path(self, file_path: str) -> Path:
+        """Resolve a file path, searching repo subdirectories if needed.
+
+        In multi-repo setups, file paths in the graph are relative to
+        individual repo roots (e.g. ``src/main.py``), but project_root
+        points to the profile directory containing multiple repos.
+        When the direct path doesn't exist, try prepending each
+        immediate subdirectory name (the repo folders).
+        """
+        direct = self._project_root_path / file_path
+        if direct.exists():
+            return direct
+        for child in sorted(self._project_root_path.iterdir()):
+            if child.is_dir() and not child.name.startswith("."):
+                candidate = child / file_path
+                if candidate.exists():
+                    return candidate
+        return direct  # fall back so callers get a sensible error
+
     async def read_file(
         self, file_path: str, offset: int | None = None, limit: int | None = None
     ) -> str:
         logger.info(lg.MCP_READ_FILE.format(path=file_path, offset=offset, limit=limit))
         try:
+            resolved = self._resolve_path(file_path)
+            # Convert back to a path relative to project_root for the
+            # file-reader tool (which applies its own validation).
+            try:
+                resolved_rel = str(resolved.relative_to(self._project_root_path))
+            except ValueError:
+                resolved_rel = file_path
+
             if offset is not None or limit is not None:
-                full_path = Path(self.project_root) / file_path
+                full_path = resolved
                 start = offset if offset is not None else 0
 
                 with open(full_path, encoding=cs.ENCODING_UTF8) as f:
@@ -466,7 +500,7 @@ class MCPToolsRegistry:
                     )
                     return header + paginated_content
             else:
-                result = await self._file_reader_tool.function(file_path=file_path)
+                result = await self._file_reader_tool.function(file_path=resolved_rel)
                 return str(result)
 
         except Exception as e:
@@ -476,8 +510,13 @@ class MCPToolsRegistry:
     async def write_file(self, file_path: str, content: str) -> str:
         logger.info(lg.MCP_WRITE_FILE.format(path=file_path))
         try:
+            resolved = self._resolve_path(file_path)
+            try:
+                resolved_rel = str(resolved.relative_to(self._project_root_path))
+            except ValueError:
+                resolved_rel = file_path
             result = await self._file_writer_tool.function(
-                file_path=file_path, content=content
+                file_path=resolved_rel, content=content
             )
             if result.success:
                 return cs.MCP_WRITE_SUCCESS.format(path=file_path)
@@ -491,7 +530,12 @@ class MCPToolsRegistry:
     ) -> str:
         logger.info(lg.MCP_LIST_DIR.format(path=directory_path))
         try:
-            result = self._directory_lister_tool.function(directory_path=directory_path)
+            resolved = self._resolve_path(directory_path)
+            try:
+                resolved_rel = str(resolved.relative_to(self._project_root_path))
+            except ValueError:
+                resolved_rel = directory_path
+            result = self._directory_lister_tool.function(directory_path=resolved_rel)
             return str(result)
         except Exception as e:
             logger.error(lg.MCP_ERROR_LIST_DIR.format(error=e))
