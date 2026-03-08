@@ -56,6 +56,11 @@ WHERE c.qualified_name ENDS WITH '.UserService'
 RETURN m.name AS name, m.qualified_name AS qualified_name, labels(m) AS type
 LIMIT {CYPHER_DEFAULT_LIMIT}"""
 
+CYPHER_EXAMPLE_FIND_METHOD_BY_NAME = f"""MATCH (mod:Module)-[:DEFINES]->(c:Class)-[:DEFINES_METHOD]->(m:Method)
+WHERE m.name = '__init__' AND mod.qualified_name ENDS WITH '.UserService'
+RETURN m.name AS name, m.qualified_name AS qualified_name, c.name AS class_name, m.start_line AS start_line, m.end_line AS end_line
+LIMIT {CYPHER_DEFAULT_LIMIT}"""
+
 CYPHER_EXPORT_NODES = """
 MATCH (n)
 RETURN id(n) as node_id, labels(n) as labels, properties(n) as properties

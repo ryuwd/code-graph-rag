@@ -96,7 +96,9 @@ MCP_INDEX_REPOSITORY = (
 MCP_QUERY_CODE_GRAPH = (
     "Query the codebase knowledge graph using natural language. "
     "Ask questions like 'What functions call UserService.create_user?' or "
-    "'Show me all classes that implement the Repository interface'."
+    "'Show me all classes that implement the Repository interface'. "
+    "Note: This tool requires an LLM provider to translate queries to Cypher. "
+    "If unavailable, use get_graph_schema + run_cypher instead."
 )
 
 MCP_GET_CODE_SNIPPET = (
@@ -138,7 +140,10 @@ MCP_PARAM_CYPHER_QUERY = (
 MCP_RUN_CYPHER = (
     "Execute a raw Cypher query directly against the Memgraph knowledge graph. "
     "Only read-only queries (MATCH/RETURN) are allowed. "
-    "Use get_graph_schema first to understand the available node types and relationships."
+    "Use get_graph_schema first to understand the available node types and relationships. "
+    "Key pattern for finding methods: MATCH (m:Module)-[:DEFINES]->(c:Class)-[:DEFINES_METHOD]->(meth:Method) "
+    "WHERE meth.name = 'method_name' AND m.qualified_name ENDS WITH '.ClassName'. "
+    "NEVER start from File nodes for code structure queries — use Module instead."
 )
 
 MCP_GET_GRAPH_SCHEMA = (
@@ -148,7 +153,11 @@ MCP_GET_GRAPH_SCHEMA = (
     "Interface, Enum, Type, Union, ExternalPackage. "
     "Relationships include: CONTAINS_PACKAGE, CONTAINS_FOLDER, CONTAINS_FILE, CONTAINS_MODULE, "
     "DEFINES, DEFINES_METHOD, IMPORTS, EXPORTS, INHERITS, IMPLEMENTS, OVERRIDES, "
-    "DEPENDS_ON_EXTERNAL, CALLS."
+    "DEPENDS_ON_EXTERNAL, CALLS. "
+    "CRITICAL: File and Module are SIBLING nodes under Folder/Package — there is NO File→Module "
+    "relationship. To find code structure (classes, functions, methods), always start from Module: "
+    "Module -[:DEFINES]-> Class -[:DEFINES_METHOD]-> Method. "
+    "Use File nodes ONLY for file path/name queries."
 )
 
 

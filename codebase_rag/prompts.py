@@ -6,6 +6,7 @@ from .cypher_queries import (
     CYPHER_EXAMPLE_DECORATED_FUNCTIONS,
     CYPHER_EXAMPLE_FILES_IN_FOLDER,
     CYPHER_EXAMPLE_FIND_FILE,
+    CYPHER_EXAMPLE_FIND_METHOD_BY_NAME,
     CYPHER_EXAMPLE_KEYWORD_SEARCH,
     CYPHER_EXAMPLE_LIMIT_ONE,
     CYPHER_EXAMPLE_PYTHON_FILES,
@@ -40,7 +41,9 @@ CYPHER_QUERY_RULES = """**2. Critical Cypher Query Rules**
 - **Use `STARTS WITH` for Paths**: When matching paths, always use `STARTS WITH` for robustness (e.g., `WHERE n.path STARTS WITH 'workflows/src'`). Do not use `=`.
 - **Use `ENDS WITH` for qualified_name**: The `qualified_name` property contains full paths like `'Project.folder.subfolder.ClassName'`. When users mention a class, function, or method by its short name (e.g., "VatManager"), use `ENDS WITH` to match: `WHERE c.qualified_name ENDS WITH '.VatManager'`. Do NOT use `{name: 'VatManager'}` equality matching.
 - **Use `toLower()` for Searches**: For case-insensitive searching on string properties, use `toLower()`.
-- **Querying Lists**: To check if a list property (like `decorators`) contains an item, use the `ANY` or `IN` clause (e.g., `WHERE 'flow' IN n.decorators`)."""
+- **Querying Lists**: To check if a list property (like `decorators`) contains an item, use the `ANY` or `IN` clause (e.g., `WHERE 'flow' IN n.decorators`).
+- **ONLY use node labels from the schema**: The ONLY valid node labels are: Project, Package, Folder, File, Module, Class, Function, Method, Interface, Enum, Type, Union, ExternalPackage. NEVER invent labels like "BookkeepingDB" or "UserController" — these are node *names*, not labels.
+- **File vs Module — CRITICAL**: `File` and `Module` are SIBLING nodes under `Folder`/`Package`. There is NO `File → Module` relationship. To find code structure (classes, functions, methods), ALWAYS start from `Module`, not `File`. Use `File` nodes ONLY for file path/name queries. The code structure hierarchy is: `Module -[:DEFINES]-> Class -[:DEFINES_METHOD]-> Method`."""
 
 
 def build_graph_schema_and_rules() -> str:
@@ -173,6 +176,11 @@ cypher// "What methods does UserService have?" or "Show me methods in UserServic
 // Use `ENDS WITH` to match the class by short name since qualified_name contains full path.
 {CYPHER_EXAMPLE_CLASS_METHODS}
 
+**Pattern: Finding a Specific Method by Name in a Module**
+cypher// "Find the __init__ method in UserService" or "Find the __insertprocessing method in LegacyOracleBookkeepingDB"
+// ALWAYS traverse Module -> Class -> Method. NEVER start from File — File nodes have no code structure relationships.
+{CYPHER_EXAMPLE_FIND_METHOD_BY_NAME}
+
 **4. Output Format**
 Provide only the Cypher query.
 """
@@ -238,6 +246,12 @@ You are a Neo4j Cypher query generator. You ONLY respond with a valid Cypher que
 *   **Cypher Query (Use ENDS WITH to match class by short name):**
     ```cypher
     {CYPHER_EXAMPLE_CLASS_METHODS}
+    ```
+
+*   **Natural Language:** "Find the __init__ method in UserService" or "Find __insertprocessing in LegacyOracleBookkeepingDB"
+*   **Cypher Query (ALWAYS use Module -> Class -> Method, NEVER start from File):**
+    ```cypher
+    {CYPHER_EXAMPLE_FIND_METHOD_BY_NAME}
     ```
 """
 
