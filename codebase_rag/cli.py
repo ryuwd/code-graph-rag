@@ -129,6 +129,13 @@ def start(
         "--interactive-setup",
         help=ch.HELP_INTERACTIVE_SETUP,
     ),
+    project_name: str | None = typer.Option(
+        None,
+        "--project-name",
+        help="Override the project name (default: directory name). "
+        "Useful for indexing multiple versions of the same repo, "
+        "e.g. --project-name 'DaVinci@v66r10'.",
+    ),
 ) -> None:
     app_context.session.confirm_edits = not no_confirm
 
@@ -175,6 +182,7 @@ def start(
                 queries=queries,
                 unignore_paths=unignore_paths,
                 exclude_paths=exclude_paths,
+                project_name=project_name,
             )
             updater.run()
 
