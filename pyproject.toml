@@ -38,7 +38,6 @@ dependencies = [
     "mcp>=1.21.1",
     "pydantic-ai>=1.27.0",
     "pydantic-settings>=2.0.0",
-    "pymgclient>=1.4.0",
     "python-dotenv>=1.1.0",
     "toml>=0.10.2",
     "tree-sitter-python>=0.23.6",
@@ -71,6 +70,10 @@ test = [
     "pytest-cov>=4.0.0",
     "pytest-xdist>=3.8.0",
     "testcontainers>=4.9.0",
+]
+
+memgraph = [
+    "pymgclient>=1.4.0",
 ]
 
 treesitter-full = [
