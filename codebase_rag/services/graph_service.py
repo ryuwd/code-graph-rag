@@ -310,7 +310,7 @@ class MemgraphIngestor:
             logger.warning(ls.MG_NO_CONSTRAINT.format(label=label))
             return 0, len(props_list)
 
-        batch_rows: list[NodeBatchRow] = []
+        seen: dict[PropertyValue, NodeBatchRow] = {}
         skipped = 0
         for props in props_list:
             if id_key not in props:
@@ -321,9 +321,14 @@ class MemgraphIngestor:
                 )
                 skipped += 1
                 continue
+            node_id = props[id_key]
             row_props: PropertyDict = {k: v for k, v in props.items() if k != id_key}
-            batch_rows.append(NodeBatchRow(id=props[id_key], props=row_props))
+            if node_id in seen:
+                seen[node_id].props.update(row_props)
+            else:
+                seen[node_id] = NodeBatchRow(id=node_id, props=row_props)
 
+        batch_rows = list(seen.values())
         if not batch_rows:
             return 0, skipped
 
