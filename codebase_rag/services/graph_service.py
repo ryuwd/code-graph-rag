@@ -375,7 +375,7 @@ class MemgraphIngestor:
             node_id = props[id_key]
             row_props: PropertyDict = {k: v for k, v in props.items() if k != id_key}
             if node_id in seen:
-                seen[node_id].props.update(row_props)
+                seen[node_id]["props"].update(row_props)
             else:
                 seen[node_id] = NodeBatchRow(id=node_id, props=row_props)
 
