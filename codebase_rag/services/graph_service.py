@@ -210,7 +210,33 @@ class MemgraphIngestor:
                     )
                 else:
                     logger.error(ls.MG_CYPHER_PARAMS.format(params=params_list))
-            raise
+            # Fall back to row-by-row execution so that one bad row
+            # doesn't prevent the rest of the batch from succeeding.
+            logger.warning(
+                "Batch failed ({count} rows), retrying row-by-row: {error}",
+                count=len(params_list),
+                error=e,
+            )
+            succeeded = 0
+            for row in params_list:
+                row_cursor = None
+                try:
+                    row_cursor = conn.cursor()
+                    row_cursor.execute(
+                        wrap_with_unwind(query), BatchWrapper(batch=[row])
+                    )
+                    succeeded += 1
+                except Exception:
+                    pass  # skip individual failures
+                finally:
+                    if row_cursor:
+                        row_cursor.close()
+            logger.info(
+                "Row-by-row fallback: {succeeded}/{total} rows succeeded",
+                succeeded=succeeded,
+                total=len(params_list),
+            )
+            return  # don't re-raise; fallback handled it
         finally:
             if cursor:
                 cursor.close()
@@ -231,7 +257,32 @@ class MemgraphIngestor:
         except Exception as e:
             logger.error(ls.MG_BATCH_ERROR.format(error=e))
             logger.error(ls.MG_CYPHER_QUERY.format(query=query))
-            raise
+            # Fall back to row-by-row execution
+            logger.warning(
+                "Batch with return failed ({count} rows), retrying row-by-row: {error}",
+                count=len(params_list),
+                error=e,
+            )
+            all_results: list[ResultRow] = []
+            for row in params_list:
+                row_cursor = None
+                try:
+                    row_cursor = conn.cursor()
+                    row_cursor.execute(
+                        wrap_with_unwind(query), BatchWrapper(batch=[row])
+                    )
+                    all_results.extend(self._cursor_to_results(row_cursor))
+                except Exception:
+                    pass  # skip individual failures
+                finally:
+                    if row_cursor:
+                        row_cursor.close()
+            logger.info(
+                "Row-by-row fallback: {succeeded}/{total} rows produced results",
+                succeeded=len(all_results),
+                total=len(params_list),
+            )
+            return all_results
         finally:
             if cursor:
                 cursor.close()
